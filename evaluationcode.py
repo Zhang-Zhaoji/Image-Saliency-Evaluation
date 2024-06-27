@@ -65,11 +65,11 @@ def Normalized_Scanpath_Saliency(image1:np.float64,image2:np.float64) -> float:
 
     compute the normalized vector pred and the normalized gt, then return the inner product
     """
-    pred = image1.reshape(-1)
-    gt = image2.reshape(-1)
+    pred = image1.copy().reshape(-1)
+    gt = image2.copy().reshape(-1)
     pred = pred - np.mean(pred)
     pred = pred / np.sqrt(np.sum(pred ** 2) + 1e-6) # normalize into [-1,1] unit varience
-    gt = gt /(np.sum(gt ** 2) + 1e-6) # normalize into [0,1] 
+    gt = gt /(np.sqrt(np.sum(gt ** 2) + 1e-6)) # normalize into [0,1] 
     return np.sum(pred * gt) # calculate and return inner product of p for expected prob and gt
 
 def Information_gain(image1:np.float64,image2:np.float64) -> float:
@@ -84,11 +84,11 @@ def Information_gain(image1:np.float64,image2:np.float64) -> float:
 
     the maximum value of IG should be 1? the higher the better
     """
-    pred = image1.reshape(-1) / (np.sum(image1) + 1e-6)
-    gt = image2.reshape(-1) / (np.sum(image2) + 1e-6)
+    pred = image1.copy().reshape(-1) / (np.sum(image1)) if np.max(image1) > 0 else image1.copy().reshape(-1)
+    gt = image2.copy().reshape(-1) / (np.sum(image2)) if np.max(image2) > 0 else image2.copy().reshape(-1)
     # default pbl using random 0-1 distrubution
-    pbl = np.random.binomial(1,0.5,len(pred))
-    pbl /= np.sum(pbl)
+    pbl = np.ones_like(gt)
+    pbl = np.float64(pbl)/np.sum(pbl)
     IG = np.sum(pred * (np.log10(gt + 1e-8) - np.log10(pbl + 1e-8)))
     return IG
     
@@ -104,12 +104,12 @@ def CC(image1:np.float64,image2:np.float64) -> float:
     of color in visual attention. Computer Vision and Image Understanding
     100(1-2), 107–123 (Oct 2005). https://doi.org/10.1016/j.cviu.2004.10.009
     """
-    pred = image1.reshape(-1)
-    gt = image2.reshape(-1)
+    pred = image1.copy().reshape(-1)
+    gt = image2.copy().reshape(-1)
     pred -= np.mean(pred)
-    pred /= np.sum(pred ** 2)
+    pred /= np.sqrt(np.sum(pred ** 2))
     gt -= np.mean(gt)
-    gt /= np.sum(gt ** 2)
+    gt /= np.sqrt(np.sum(gt ** 2))
     return np.sum(pred * gt) 
 
 def KL_Div(image1:np.float64,image2:np.float64):
@@ -119,9 +119,11 @@ def KL_Div(image1:np.float64,image2:np.float64):
     of them into probability distributions (by making them nonnegative and normalizing
     them to have unit sum).
     """
-    pred = image1.reshape(-1) / (np.sum(image1) + 1e-6)
-    gt = image2.reshape(-1) / (np.sum(image2) + 1e-6)
-    KL_Div = np.sum(gt * (np.log10(gt + 1e-6) - np.log10(pred + 1e-6)))
+    pred = np.where(image1 > 1e-8, image1.copy(), 1e-8)
+    gt = np.where(image2 > 1e-8, image2.copy(), 1e-8)
+    pred = pred.reshape(-1) / (np.max(pred)) if np.max(pred) == 0 else pred.copy().reshape(-1)
+    gt = gt.reshape(-1) / (np.max(gt)) if np.max(gt) == 0 else gt.copy().reshape(-1)
+    KL_Div = np.mean(gt * (np.log10(gt + 1e-6) - np.log10(pred + 1e-6))) 
     return KL_Div
 
 def SIM(image1:np.float64,image2:np.float64):
@@ -136,7 +138,7 @@ def SIM(image1:np.float64,image2:np.float64):
     of Saliency to Predict Human Fixations. CSAIL Technical Reports (2012).
     https://doi.org/1721.1/68590
     """
-    pred = image1.reshape(-1) / (np.sum(image1) + 1e-6)
-    gt = image2.reshape(-1) / (np.sum(image2) + 1e-6)
-    SIM_item = 1- 0.5 * np.sum(np.abs(pred - gt))
+    pred = image1.copy().reshape(-1) / (np.sum(image1)) if np.max(image1) > 0 else image1.copy().reshape(-1)
+    gt = image2.copy().reshape(-1) / (np.sum(image2)) if np.max(image2) > 0 else image2.copy().reshape(-1)
+    SIM_item = np.sum(np.where(pred <= gt, pred, gt))
     return SIM_item
